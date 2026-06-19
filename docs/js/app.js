@@ -20,7 +20,7 @@
 
     var DATA = {};
     var PIPELINE = { defaultConfig: null, options: null };
-    var state = { target: 'vmd', tab: 'resultado', breaks: [], filters: {} };
+    var state = { target: 'vmd', tab: 'pipeline', breaks: [], filters: {}, hasResults: false };
     var map, currentLayers = [];
     var charts = {};
 
@@ -81,6 +81,29 @@
         if (!btn) return;
         btn.disabled = !enabled;
     }
+    function setResultsReady(ready) {
+        state.hasResults = !!ready;
+        document.querySelectorAll('.target-btn').forEach(function (b) { b.disabled = !state.hasResults; });
+        document.querySelectorAll('.tab-btn').forEach(function (b) {
+            if (b.dataset.tab !== 'pipeline') b.disabled = !state.hasResults;
+        });
+        var empty = document.getElementById('map-empty-state');
+        var legend = document.getElementById('legend');
+        if (empty) empty.classList.toggle('hidden', state.hasResults);
+        if (legend) legend.classList.toggle('hidden', !state.hasResults);
+    }
+    function resetHeaderPlaceholders() {
+        document.getElementById('stat-total').textContent = '--';
+        document.getElementById('stat-obs').textContent = '--';
+        document.getElementById('stat-pred').textContent = '--';
+        var chip = document.getElementById('stat-slo');
+        chip.className = 'stat-chip';
+        document.getElementById('stat-slo-text').textContent = 'Aguardando execução';
+        TARGETS.forEach(function (tt) {
+            var el = document.getElementById('m-' + tt);
+            if (el) el.textContent = '';
+        });
+    }
     async function apiGet(url) {
         var r = await fetch(url);
         if (!r.ok) throw new Error('Falha API GET ' + url + ' (' + r.status + ')');
@@ -128,6 +151,10 @@
     }
 
     function renderMap() {
+        if (!state.hasResults || !DATA.segments || !DATA.segments.features) {
+            clearLayers();
+            return;
+        }
         clearLayers();
         var t = state.target;
         var layer = L.geoJSON(DATA.segments, {
@@ -557,6 +584,8 @@
         try {
             var runOut = await apiPost('/api/run', payload);
             await loadDataFiles();
+            setResultsReady(true);
+            populateFilters();
             recomputeBreaks();
             renderHeader();
             renderMap();
@@ -677,6 +706,10 @@
 
     /* ─────────── State changes ─────────── */
     function recomputeBreaks() {
+        if (!state.hasResults || !DATA.segments || !DATA.segments.features) {
+            state.breaks = [];
+            return;
+        }
         var t = state.target;
         var vals = DATA.segments.features.map(function (f) { return f.properties[t + '_final']; });
         state.breaks = quantileBreaks(vals, SCALE_COLORS.length);
@@ -688,6 +721,7 @@
         else if (state.tab === 'modelo') renderModelo();
     }
     function setTarget(t) {
+        if (!state.hasResults) return;
         state.target = t;
         document.querySelectorAll('.target-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.target === t); });
         recomputeBreaks();
@@ -696,6 +730,10 @@
         renderActiveTab();
     }
     function setTab(tab) {
+        if (!state.hasResults && tab !== 'pipeline') {
+            showPipelineStatus('Execute o pipeline para habilitar os resultados.', false);
+            tab = 'pipeline';
+        }
         state.tab = tab;
         document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === tab); });
         document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.toggle('active', p.id === 'panel-' + tab); });
@@ -715,6 +753,7 @@
         classes.forEach(function (c) { csel.insertAdjacentHTML('beforeend', '<option value="' + c + '">' + c + '</option>'); });
     }
     function applyFilters() {
+        if (!state.hasResults) return;
         var min = parseFloat(document.getElementById('filter-min').value);
         var max = parseFloat(document.getElementById('filter-max').value);
         state.filters = {
@@ -727,6 +766,7 @@
         renderMap();
     }
     function doSearch(q) {
+        if (!state.hasResults) return;
         var box = document.getElementById('search-results');
         q = (q || '').trim().toLowerCase();
         if (q.length < 2) { box.innerHTML = ''; return; }
@@ -800,22 +840,20 @@
         var loading = document.getElementById('loading');
         try {
             initMap();
-            await loadDataFiles();
             await initPipelinePanel();
 
-            populateFilters();
             bindEvents();
-            recomputeBreaks();
-            renderHeader();
+            setResultsReady(false);
+            resetHeaderPlaceholders();
             renderMap();
-            renderResultado();
-            setExcelDownloadEnabled(true);
+            setTab('pipeline');
+            setExcelDownloadEnabled(false);
+            showPipelineStatus('Suba o dataset, ajuste as opções e execute o pipeline para visualizar resultados.', false);
 
             loading.classList.add('hidden');
             setTimeout(function () {
                 loading.style.display = 'none';
                 map.invalidateSize();
-                fitToData();
             }, 100);
         } catch (err) {
             loading.innerHTML = '<p style="color:#ef4444;padding:20px;max-width:600px;">Erro: ' + err.message + '</p>';

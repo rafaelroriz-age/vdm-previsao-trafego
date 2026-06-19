@@ -37,8 +37,8 @@
         <button class="target-btn" data-target="n_usace">N-USACE <span class="tb-metric" id="m-n_usace"></span></button>
         <button class="target-btn" data-target="n_aashto">N-AASHTO <span class="tb-metric" id="m-n_aashto"></span></button>
         <div class="tab-bar">
-            <button class="tab-btn" data-tab="pipeline">Pipeline</button>
-            <button class="tab-btn active" data-tab="resultado">Resultado</button>
+            <button class="tab-btn active" data-tab="pipeline">Pipeline</button>
+            <button class="tab-btn" data-tab="resultado">Resultado</button>
             <button class="tab-btn" data-tab="calibracao">Calibração</button>
             <button class="tab-btn" data-tab="modelo">Modelo</button>
         </div>
@@ -47,7 +47,7 @@
     <div id="main">
         <aside id="sidebar">
             <!-- Pipeline -->
-            <div class="tab-panel" id="panel-pipeline">
+            <div class="tab-panel active" id="panel-pipeline">
                 <div class="panel-intro">Configuração avançada (estilo Streamlit) para rodar o pipeline sem sair do mapa.</div>
 
                 <h3>Dataset e Agrupamento</h3>
@@ -112,7 +112,7 @@
             </div>
 
             <!-- Resultado -->
-            <div class="tab-panel active" id="panel-resultado">
+            <div class="tab-panel" id="panel-resultado">
                 <div class="panel-intro">Valor <strong id="intro-target">VMD</strong> por segmento: observado (linha cheia) ou previsto pela regressão (tracejado).</div>
                 <div class="stats-grid" id="stats-resultado"></div>
                 <h3>Filtros</h3>
@@ -183,6 +183,10 @@
 
         <div id="map-container">
             <div id="map"></div>
+            <div id="map-empty-state">
+                <div class="empty-title">Sem resultados ainda</div>
+                <div class="empty-text">Faça upload do dataset, escolha as opções e clique em Executar Pipeline.</div>
+            </div>
             <div id="legend">
                 <h4 id="legend-title">Valor</h4>
                 <div class="legend-items" id="legend-items"></div>
