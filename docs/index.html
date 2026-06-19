@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Previsão de Tráfego — Goiás (Regressão OLS)</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header id="header">
+        <div class="header-left">
+            <span class="material-icons-outlined header-icon">insights</span>
+            <div>
+                <h1>Previsão de Tráfego — Goiás</h1>
+                <p class="subtitle">Regressão Linear (OLS) &mdash; VMD, VMDc, N-USACE, N-AASHTO</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="stat-chip"><span class="material-icons-outlined">straighten</span><span id="stat-total">--</span> seg</div>
+            <div class="stat-chip"><span class="material-icons-outlined">visibility</span><span id="stat-obs">--</span> obs</div>
+            <div class="stat-chip accent"><span class="material-icons-outlined">auto_awesome</span><span id="stat-pred">--</span> prev</div>
+            <div class="stat-chip" id="stat-slo"><span class="material-icons-outlined">verified</span><span id="stat-slo-text">--</span></div>
+        </div>
+    </header>
+
+    <nav id="target-bar">
+        <span class="tb-label">Variável</span>
+        <button class="target-btn active" data-target="vmd">VMD <span class="tb-metric" id="m-vmd"></span></button>
+        <button class="target-btn" data-target="vmdc">VMDc <span class="tb-metric" id="m-vmdc"></span></button>
+        <button class="target-btn" data-target="n_usace">N-USACE <span class="tb-metric" id="m-n_usace"></span></button>
+        <button class="target-btn" data-target="n_aashto">N-AASHTO <span class="tb-metric" id="m-n_aashto"></span></button>
+        <div class="tab-bar">
+            <button class="tab-btn" data-tab="pipeline">Pipeline</button>
+            <button class="tab-btn active" data-tab="resultado">Resultado</button>
+            <button class="tab-btn" data-tab="calibracao">Calibração</button>
+            <button class="tab-btn" data-tab="modelo">Modelo</button>
+        </div>
+    </nav>
+
+    <div id="main">
+        <aside id="sidebar">
+            <!-- Pipeline -->
+            <div class="tab-panel" id="panel-pipeline">
+                <div class="panel-intro">Configuração avançada (estilo Streamlit) para rodar o pipeline sem sair do mapa.</div>
+
+                <h3>Dataset e Agrupamento</h3>
+                <div class="filter-group">
+                    <label>Dataset (caminho)</label>
+                    <input type="text" id="cfg-dataset" placeholder="data/raw/sre_abr_2026_georef_vdm_v4.xlsx">
+                </div>
+                <div class="filter-group">
+                    <label>Upload de dataset (.xlsx/.xls/.csv)</label>
+                    <input type="file" id="cfg-upload" accept=".xlsx,.xls,.csv">
+                    <button class="btn-apply btn-mini" id="btn-upload-dataset" type="button">Enviar Arquivo</button>
+                </div>
+                <div class="filter-group">
+                    <label>Coluna de grupo</label>
+                    <select id="cfg-group-col"></select>
+                </div>
+                <div class="filter-group">
+                    <label>Número de junções de grupo</label>
+                    <input type="number" id="cfg-group-merge-count" min="0" max="5" value="1">
+                </div>
+                <div id="cfg-group-merges-container"></div>
+
+                <h3>Targets e Transformações</h3>
+                <div class="check-grid" id="cfg-targets"></div>
+                <div id="cfg-bool-merges"></div>
+
+                <h3>Hiperparâmetros</h3>
+                <div class="filter-group">
+                    <label>P-value threshold</label>
+                    <input type="number" step="0.01" min="0.01" max="0.50" id="cfg-pvalue" value="0.15">
+                </div>
+                <div class="check-grid">
+                    <label><input type="checkbox" id="cfg-log"> Log-transform</label>
+                    <label><input type="checkbox" id="cfg-clip" checked> Clip previsões</label>
+                    <label><input type="checkbox" id="cfg-use-max"> Limitar features</label>
+                    <label><input type="checkbox" id="cfg-strat"> Estratificado por região</label>
+                </div>
+                <div class="filter-group">
+                    <label>Máx. features</label>
+                    <input type="number" id="cfg-max-feat" min="1" max="20" value="6">
+                </div>
+                <div class="filter-group">
+                    <label>Mínimo treino por região (estratificado)</label>
+                    <input type="number" id="cfg-min-train" min="5" max="50" value="10">
+                </div>
+
+                <h3>Features por Target</h3>
+                <div class="filter-group">
+                    <button class="btn-apply" id="btn-refresh-cands" type="button">Atualizar Candidatas</button>
+                </div>
+                <div id="cfg-features-per-target"></div>
+
+                <h3>Encoding Categóricas</h3>
+                <div id="cfg-encoding"></div>
+
+                <div class="pipeline-actions">
+                    <button class="btn-apply" id="btn-run-pipeline" type="button">Executar Pipeline</button>
+                    <div id="pipeline-status" class="note"></div>
+                </div>
+            </div>
+
+            <!-- Resultado -->
+            <div class="tab-panel active" id="panel-resultado">
+                <div class="panel-intro">Valor <strong id="intro-target">VMD</strong> por segmento: observado (linha cheia) ou previsto pela regressão (tracejado).</div>
+                <div class="stats-grid" id="stats-resultado"></div>
+                <h3>Filtros</h3>
+                <div class="filter-group">
+                    <label>Fonte</label>
+                    <select id="filter-source">
+                        <option value="all">Todas</option>
+                        <option value="observado">Observado</option>
+                        <option value="previsto">Previsto (regressão)</option>
+                        <option value="media_global">Previsto (média)</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Faixa de valor</label>
+                    <div class="range-inputs">
+                        <input type="number" id="filter-min" placeholder="Min" value="0">
+                        <span>&mdash;</span>
+                        <input type="number" id="filter-max" placeholder="Max">
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label>Regional</label>
+                    <select id="filter-regional"><option value="all">Todas</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>Classe</label>
+                    <select id="filter-classe"><option value="all">Todas</option></select>
+                </div>
+                <button class="btn-apply" id="btn-filter">Aplicar Filtros</button>
+                <h3>Buscar Segmento</h3>
+                <div class="search-box">
+                    <span class="material-icons-outlined">search</span>
+                    <input type="text" id="search-input" placeholder="SRE, GO ou Regional...">
+                </div>
+                <div id="search-results" class="search-results"></div>
+                <h3>Distribuição</h3>
+                <canvas id="chart-dist" height="170"></canvas>
+                <h3>Média por Regional</h3>
+                <canvas id="chart-regional" height="200"></canvas>
+            </div>
+
+            <!-- Calibração -->
+            <div class="tab-panel" id="panel-calibracao">
+                <div class="panel-intro">Validação do modelo contra os valores observados (ajuste em amostra). Quanto mais próximo da diagonal, melhor.</div>
+                <div class="stats-grid" id="stats-calibracao"></div>
+                <h3>Observado vs Estimado</h3>
+                <canvas id="chart-scatter" height="240"></canvas>
+                <h3>Distribuição do Erro (%)</h3>
+                <canvas id="chart-resid" height="170"></canvas>
+            </div>
+
+            <!-- Modelo -->
+            <div class="tab-panel" id="panel-modelo">
+                <div class="panel-intro">Equação explicável da regressão. Use a fórmula em calculadora, Excel ou LaTeX.</div>
+                <h3>Critério de Aceite (SLO)</h3>
+                <div id="slo-status"></div>
+                <h3>Equação (LaTeX)</h3>
+                <div class="formula-box" id="formula-latex"></div>
+                <h3>Fórmula Excel</h3>
+                <div class="code-box" id="formula-excel"><button class="copy-btn" data-copy="formula-excel-text"><span class="material-icons-outlined" style="font-size:14px">content_copy</span></button><span id="formula-excel-text"></span></div>
+                <div class="note" id="formula-note"></div>
+                <h3>Coeficientes</h3>
+                <table class="feat-table" id="coef-table"></table>
+                <h3>Equação (texto)</h3>
+                <div class="code-box" id="formula-texto"><button class="copy-btn" data-copy="formula-texto-text"><span class="material-icons-outlined" style="font-size:14px">content_copy</span></button><span id="formula-texto-text"></span></div>
+            </div>
+        </aside>
+
+        <div id="map-container">
+            <div id="map"></div>
+            <div id="legend">
+                <h4 id="legend-title">Valor</h4>
+                <div class="legend-items" id="legend-items"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading">
+        <div class="spinner"></div>
+        <p>Carregando dados...</p>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

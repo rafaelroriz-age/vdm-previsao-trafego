@@ -1,0 +1,14 @@
+# Dados / saídas
+data/raw/*.xlsx
+data/raw/*.json
+data/export/*.xlsx
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Temp
+search_loc.txt
+*.tmp
