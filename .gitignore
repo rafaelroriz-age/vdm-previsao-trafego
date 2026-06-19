@@ -2,6 +2,8 @@
 data/raw/*.xlsx
 data/raw/*.json
 data/export/*.xlsx
+docs/data/local/*.json
+docs/data/local/*.geojson
 
 # Python
 __pycache__/

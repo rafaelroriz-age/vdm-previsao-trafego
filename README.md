@@ -91,7 +91,22 @@ python -m http.server 8778 --directory docs
 # abra http://localhost:8778
 ```
 
-> Para execução dinâmica, use `webapp.py`. O `http.server` serve somente os arquivos estáticos já exportados em `docs/data/`.
+> O frontend agora inicia em modo estático por padrão: se existir dado em `docs/data/` (ou `docs/data/local/`), o mapa abre sem exigir API. O `webapp.py` só é necessário para upload/reprocessamento via aba Pipeline.
+
+## Dataset JSON local privado (gitignored)
+
+Se quiser ler dados transformados em JSON sem versionar no repositório:
+
+1. Crie a pasta `docs/data/local/`.
+2. Coloque nela os quatro arquivos:
+  - `segments.geojson`
+  - `count_points.geojson`
+  - `model_metrics.json`
+  - `calibration_report.json`
+3. Abra o site estático normalmente (`python -m http.server 8778 --directory docs`).
+
+O app tenta carregar primeiro `docs/data/local/` e, se não encontrar, usa `docs/data/`.
+As extensões `.json` e `.geojson` em `docs/data/local/` estão no `.gitignore` para manter esses dados fora do Git.
 
 ## Deploy
 

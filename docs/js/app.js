@@ -23,6 +23,7 @@
     var state = { target: 'vmd', tab: 'pipeline', breaks: [], filters: {}, hasResults: false };
     var API_BASE = '';
     var API_FALLBACK = 'http://127.0.0.1:8777';
+    var API_AVAILABLE = false;
     var map, currentLayers = [];
     var charts = {};
 
@@ -81,7 +82,14 @@
     function setExcelDownloadEnabled(enabled) {
         var btn = document.getElementById('btn-download-excel');
         if (!btn) return;
-        btn.disabled = !enabled;
+        btn.disabled = !enabled || !API_AVAILABLE;
+    }
+    function setPipelineControlsEnabled(enabled) {
+        ['btn-run-pipeline', 'btn-refresh-cands', 'btn-upload-dataset', 'cfg-upload'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.disabled = !enabled;
+        });
+        setExcelDownloadEnabled(enabled && state.hasResults);
     }
     function setResultsReady(ready) {
         state.hasResults = !!ready;
@@ -595,6 +603,10 @@
         });
     }
     async function refreshCandidatesFromUI() {
+        if (!API_AVAILABLE) {
+            showPipelineStatus('API offline: atualização de candidatas exige backend.', true);
+            return;
+        }
         var cfgNow = collectPipelineConfig();
         showPipelineStatus('Atualizando candidatas...', false);
         var cands = await apiPost('/api/candidates', cfgNow);
@@ -607,6 +619,10 @@
         showPipelineStatus('Candidatas atualizadas.', false);
     }
     async function runPipelineFromUI() {
+        if (!API_AVAILABLE) {
+            showPipelineStatus('API offline: execute "python webapp.py" para rodar o pipeline.', true);
+            return;
+        }
         var btn = document.getElementById('btn-run-pipeline');
         var payload = collectPipelineConfig();
         if (!payload.targets || !payload.targets.length) {
@@ -637,6 +653,10 @@
         }
     }
     async function uploadDatasetFromUI() {
+        if (!API_AVAILABLE) {
+            showPipelineStatus('API offline: upload de dataset exige backend.', true);
+            return;
+        }
         var input = document.getElementById('cfg-upload');
         if (!input || !input.files || !input.files.length) {
             showPipelineStatus('Selecione um arquivo para upload.', true);
@@ -660,6 +680,11 @@
         showPipelineStatus('Upload concluído: ' + (out.filename || 'arquivo') + '.', false);
     }
     async function initPipelinePanel() {
+        if (!API_AVAILABLE) {
+            setPipelineControlsEnabled(false);
+            showPipelineStatus('Modo estático ativo. Para pipeline/upload, execute "python webapp.py".', false);
+            return;
+        }
         try {
             var pack = await apiGet('/api/options');
             PIPELINE.defaultConfig = pack.default;
@@ -700,6 +725,7 @@
 
             showPipelineStatus('Configuração carregada.', false);
         } catch (e) {
+            setPipelineControlsEnabled(false);
             showPipelineStatus('Não foi possível carregar opções da API: ' + e.message, true);
         }
     }
@@ -863,12 +889,19 @@
     }
 
     async function loadDataFiles() {
-        var base = 'data/';
+        var bases = ['data/local/', 'data/'];
         var names = ['segments.geojson', 'count_points.geojson', 'model_metrics.json', 'calibration_report.json'];
-        var res = await Promise.all(names.map(function (n) { return fetch(base + n + '?t=' + Date.now()); }));
-        for (var i = 0; i < res.length; i++) {
-            if (!res[i].ok) throw new Error('Falha ao carregar ' + names[i] + ' (' + res[i].status + ')');
+        var res = null;
+        for (var b = 0; b < bases.length; b++) {
+            var base = bases[b];
+            var candidate = await Promise.all(names.map(function (n) { return fetch(base + n + '?t=' + Date.now()); }));
+            var ok = candidate.every(function (r) { return r.ok; });
+            if (ok) {
+                res = candidate;
+                break;
+            }
         }
+        if (!res) throw new Error('Não foi possível carregar arquivos de dados em data/local/ nem data/.');
         DATA.segments = await res[0].json();
         DATA.points = await res[1].json();
         DATA.metrics = await res[2].json();
@@ -878,18 +911,48 @@
     /* ─────────── Init ─────────── */
     async function init() {
         var loading = document.getElementById('loading');
+        var initErrors = [];
         try {
             initMap();
-            await resolveApiBase();
-            await initPipelinePanel();
-
             bindEvents();
-            setResultsReady(false);
-            resetHeaderPlaceholders();
-            renderMap();
-            setTab('pipeline');
+            setPipelineControlsEnabled(false);
+
+            try {
+                await loadDataFiles();
+                setResultsReady(true);
+                populateFilters();
+                recomputeBreaks();
+                renderHeader();
+                renderMap();
+                setTab('resultado');
+            } catch (eData) {
+                initErrors.push('Dados estáticos indisponíveis: ' + eData.message);
+                setResultsReady(false);
+                resetHeaderPlaceholders();
+                renderMap();
+                setTab('pipeline');
+            }
+
+            try {
+                await resolveApiBase();
+                API_AVAILABLE = true;
+            } catch (eApi) {
+                API_AVAILABLE = false;
+                initErrors.push('API offline (pipeline/upload desabilitados).');
+            }
+
+            await initPipelinePanel();
+            if (API_AVAILABLE) setPipelineControlsEnabled(true);
+
+            if (!state.hasResults && !API_AVAILABLE) {
+                showPipelineStatus('Sem dados estáticos e sem API. Execute "python webapp.py" para modo dinâmico.', true);
+            } else if (state.hasResults && !API_AVAILABLE) {
+                showPipelineStatus('Modo estático carregado. Para reprocessar dados, execute "python webapp.py".', false);
+            } else if (state.hasResults && API_AVAILABLE) {
+                showPipelineStatus('Dados estáticos carregados e API online para reprocessamento.', false);
+            }
+
             setExcelDownloadEnabled(false);
-            showPipelineStatus('Suba o dataset, ajuste as opções e execute o pipeline para visualizar resultados.', false);
 
             loading.classList.add('hidden');
             setTimeout(function () {
@@ -897,7 +960,8 @@
                 map.invalidateSize();
             }, 100);
         } catch (err) {
-            loading.innerHTML = '<p style="color:#ef4444;padding:20px;max-width:600px;">Erro: ' + err.message + '</p>';
+            var msg = [err.message].concat(initErrors).join(' | ');
+            loading.innerHTML = '<p style="color:#ef4444;padding:20px;max-width:760px;">Erro: ' + msg + '</p>';
             console.error(err);
         }
     }
