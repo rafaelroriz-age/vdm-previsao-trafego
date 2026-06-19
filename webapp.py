@@ -24,6 +24,14 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 EXCEL_OUT = cfg.EXPORT_DIR / "sre_previsao_trafego.xlsx"
 
 
+@app.after_request
+def add_cors_headers(resp):
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return resp
+
+
 @app.get("/")
 def index():
     return send_from_directory(app.static_folder, "index.html")

@@ -21,6 +21,8 @@
     var DATA = {};
     var PIPELINE = { defaultConfig: null, options: null };
     var state = { target: 'vmd', tab: 'pipeline', breaks: [], filters: {}, hasResults: false };
+    var API_BASE = '';
+    var API_FALLBACK = 'http://127.0.0.1:8777';
     var map, currentLayers = [];
     var charts = {};
 
@@ -105,21 +107,54 @@
         });
     }
     async function apiGet(url) {
-        var r = await fetch(url);
-        if (!r.ok) throw new Error('Falha API GET ' + url + ' (' + r.status + ')');
+        var fullUrl = API_BASE + url;
+        var r;
+        try {
+            r = await fetch(fullUrl);
+        } catch (err) {
+            throw new Error('Não foi possível conectar à API (' + fullUrl + '). Inicie o backend com "python webapp.py".');
+        }
+        if (!r.ok) throw new Error('Falha API GET ' + fullUrl + ' (' + r.status + ')');
         return r.json();
     }
     async function apiPost(url, payload) {
-        var r = await fetch(url, {
+        var fullUrl = API_BASE + url;
+        var r;
+        try {
+            r = await fetch(fullUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload || {})
         });
+        } catch (err) {
+            throw new Error('Não foi possível conectar à API (' + fullUrl + '). Inicie o backend com "python webapp.py".');
+        }
         var out = await r.json().catch(function () { return {}; });
         if (!r.ok || out.ok === false) {
             throw new Error(out.error || out.message || ('Falha API POST ' + url));
         }
         return out;
+    }
+    async function resolveApiBase() {
+        var candidates = [];
+        if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+            candidates.push(window.location.origin);
+        }
+        if (candidates.indexOf(API_FALLBACK) < 0) candidates.push(API_FALLBACK);
+
+        for (var i = 0; i < candidates.length; i++) {
+            var base = candidates[i];
+            try {
+                var r = await fetch(base + '/api/health', { cache: 'no-store' });
+                if (r.ok) {
+                    API_BASE = base;
+                    return;
+                }
+            } catch (e) {
+                // tenta próximo candidato
+            }
+        }
+        throw new Error('API indisponível. Execute "python webapp.py" e acesse em ' + API_FALLBACK + '.');
     }
 
     /* ─────────── Map ─────────── */
@@ -610,7 +645,12 @@
         var fd = new FormData();
         fd.append('file', input.files[0]);
         showPipelineStatus('Enviando dataset...', false);
-        var r = await fetch('/api/upload', { method: 'POST', body: fd });
+        var r;
+        try {
+            r = await fetch(API_BASE + '/api/upload', { method: 'POST', body: fd });
+        } catch (err) {
+            throw new Error('Falha de conexão no upload. Verifique se o backend está rodando em ' + API_BASE + '.');
+        }
         var out = await r.json().catch(function () { return {}; });
         if (!r.ok || out.ok === false) {
             throw new Error(out.error || 'Falha no upload');
@@ -808,7 +848,7 @@
         });
         var bExcel = document.getElementById('btn-download-excel');
         if (bExcel) bExcel.addEventListener('click', function () {
-            window.location.href = '/api/download/excel?t=' + Date.now();
+            window.location.href = API_BASE + '/api/download/excel?t=' + Date.now();
         });
         var si = document.getElementById('search-input'), tmr;
         si.addEventListener('input', function () { clearTimeout(tmr); tmr = setTimeout(function () { doSearch(si.value); }, 250); });
@@ -840,6 +880,7 @@
         var loading = document.getElementById('loading');
         try {
             initMap();
+            await resolveApiBase();
             await initPipelinePanel();
 
             bindEvents();
