@@ -80,6 +80,9 @@ body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg-pri
 .range-inputs span { color: var(--text-muted); font-size: 11px; }
 .btn-apply { width: 100%; padding: 8px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: 600; font-size: 12px; margin-top: 4px; transition: background 0.2s; }
 .btn-apply:hover { background: var(--accent-dark); }
+.btn-apply.btn-secondary { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary); }
+.btn-apply.btn-secondary:hover { background: #445269; }
+.btn-apply:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-mini { padding: 6px 8px; font-size: 11px; margin-top: 6px; }
 
 .check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }

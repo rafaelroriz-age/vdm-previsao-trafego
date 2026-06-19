@@ -60,6 +60,27 @@
         el.style.color = isError ? '#ef4444' : '#94a3b8';
         el.textContent = msg || '';
     }
+    function renderPipelineRunSummary(runOut) {
+        var el = document.getElementById('pipeline-run-summary');
+        if (!el) return;
+        if (!runOut || !runOut.summary) {
+            el.textContent = '';
+            return;
+        }
+        var parts = [];
+        Object.keys(runOut.summary).forEach(function (t) {
+            var s = runOut.summary[t] || {};
+            var r2 = s.r2 != null ? s.r2.toFixed(3) : '-';
+            var mape = s.mape != null ? s.mape.toFixed(1) + '%' : '-';
+            parts.push((TARGET_LABELS[t] || t) + ': R²=' + r2 + ', MAPE=' + mape);
+        });
+        el.textContent = parts.length ? ('Última execução: ' + parts.join(' | ')) : '';
+    }
+    function setExcelDownloadEnabled(enabled) {
+        var btn = document.getElementById('btn-download-excel');
+        if (!btn) return;
+        btn.disabled = !enabled;
+    }
     async function apiGet(url) {
         var r = await fetch(url);
         if (!r.ok) throw new Error('Falha API GET ' + url + ' (' + r.status + ')');
@@ -531,17 +552,21 @@
             return;
         }
         btn.disabled = true;
+        setExcelDownloadEnabled(false);
         showPipelineStatus('Executando pipeline... isso pode levar alguns segundos.', false);
         try {
-            await apiPost('/api/run', payload);
+            var runOut = await apiPost('/api/run', payload);
             await loadDataFiles();
             recomputeBreaks();
             renderHeader();
             renderMap();
             renderActiveTab();
+            renderPipelineRunSummary(runOut);
+            setExcelDownloadEnabled(true);
             showPipelineStatus('Pipeline concluído e mapa atualizado.', false);
             setTab('resultado');
         } catch (e) {
+            renderPipelineRunSummary(null);
             showPipelineStatus('Erro: ' + e.message, true);
         } finally {
             btn.disabled = false;
@@ -741,6 +766,10 @@
         if (bUpload) bUpload.addEventListener('click', function () {
             uploadDatasetFromUI().catch(function (e) { showPipelineStatus('Erro: ' + e.message, true); });
         });
+        var bExcel = document.getElementById('btn-download-excel');
+        if (bExcel) bExcel.addEventListener('click', function () {
+            window.location.href = '/api/download/excel?t=' + Date.now();
+        });
         var si = document.getElementById('search-input'), tmr;
         si.addEventListener('input', function () { clearTimeout(tmr); tmr = setTimeout(function () { doSearch(si.value); }, 250); });
         document.querySelectorAll('.copy-btn').forEach(function (btn) {
@@ -780,6 +809,7 @@
             renderHeader();
             renderMap();
             renderResultado();
+            setExcelDownloadEnabled(true);
 
             loading.classList.add('hidden');
             setTimeout(function () {

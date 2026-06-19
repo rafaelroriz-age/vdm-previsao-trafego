@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_file, send_from_directory
 
 import config as cfg
 from src.runtime_pipeline import build_candidates, default_runtime_config, run_pipeline_runtime
@@ -21,6 +21,7 @@ from src.runtime_pipeline import build_candidates, default_runtime_config, run_p
 app = Flask(__name__, static_folder=str(cfg.BASE_DIR / "docs"), static_url_path="")
 UPLOAD_DIR = cfg.BASE_DIR / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+EXCEL_OUT = cfg.EXPORT_DIR / "sre_previsao_trafego.xlsx"
 
 
 @app.get("/")
@@ -56,7 +57,26 @@ def api_candidates():
 def api_run():
     payload = request.get_json(silent=True) or {}
     result = run_pipeline_runtime(payload)
+    result["download"] = {
+        "excel_url": "/api/download/excel",
+        "excel_name": EXCEL_OUT.name,
+    }
     return jsonify(result)
+
+
+@app.get("/api/download/excel")
+def api_download_excel():
+    if not EXCEL_OUT.exists():
+        return jsonify({
+            "ok": False,
+            "error": "Arquivo Excel não encontrado. Execute o pipeline primeiro.",
+        }), 404
+    return send_file(
+        EXCEL_OUT,
+        as_attachment=True,
+        download_name=EXCEL_OUT.name,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @app.post("/api/upload")

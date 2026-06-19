@@ -82,10 +82,16 @@ python pipeline.py
 # 2) Validar (testes + SLO)
 python -m pytest -q
 
-# 3) Visualizar o mapa localmente
-python -m http.server 8777 --directory docs
+# 3) Fluxo dinâmico (upload -> opções -> pipeline -> visualizar/exportar Excel)
+python webapp.py
 # abra http://localhost:8777
+
+# 4) (Opcional) Visualizar apenas o site estático gerado
+python -m http.server 8778 --directory docs
+# abra http://localhost:8778
 ```
+
+> Para execução dinâmica, use `webapp.py`. O `http.server` serve somente os arquivos estáticos já exportados em `docs/data/`.
 
 ## Deploy
 
