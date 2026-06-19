@@ -1,4 +1,29 @@
+---
+title: Baseline de Metricas e Metodologia
+type: knowledge
+status: validated
+confidence: 0.90
+owner: engenharia de dados
+related:
+  - ../processes/pipeline-batch.md
+  - ../decisions/ADR-0001-ols-com-smearing.md
+  - glossario.md
+  - ../plans/divergencias.md
+tags: [metrica, baseline, metodologia, slo]
+last_updated: 2026-06-19
+---
+
+<!-- ai-summary
+System: consolida metodologia OLS, metricas por target e criterios de aceite SLO.
+Flow: treinar modelo -> medir R2/MAPE -> comparar com SLO -> registrar ressalvas.
+Owner: engenharia de dados.
+Systems: config.py, src/regression.py, tests/test_export.py.
+Status: validated.
+-->
+
 # Baseline de Métricas e Metodologia
+
+> Migrado e consolidado de documentacao historica interna do projeto de regressao.
 
 > Documentação do ciclo: registro do que foi decidido, codificado, testado e
 > aprovado para o sistema de previsão de tráfego por regressão OLS.

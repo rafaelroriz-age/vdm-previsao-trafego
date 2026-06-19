@@ -1,4 +1,28 @@
+---
+title: Glossario de Features
+type: knowledge
+status: validated
+confidence: 0.90
+owner: engenharia de dados
+related:
+   - baseline-metricas.md
+   - ../processes/pipeline-batch.md
+   - ../systems/artefatos-dados.md
+tags: [glossario, features, regressao]
+last_updated: 2026-06-19
+---
+
+<!-- ai-summary
+System: define semanticamente cada feature usada nas equacoes de regressao.
+Flow: identificar feature -> entender origem -> aplicar na formula com smearing.
+Owner: engenharia de dados.
+Systems: config.py, src/formulas.py, src/regression.py.
+Status: validated.
+-->
+
 # Glossário de Features
+
+> Migrado e consolidado de documentacao tecnica existente no projeto.
 
 Variáveis usadas nas equações de regressão, para engenheiros e técnicos.
 
