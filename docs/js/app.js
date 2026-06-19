@@ -20,7 +20,7 @@
 
     var DATA = {};
     var PIPELINE = { defaultConfig: null, options: null };
-    var state = { target: 'vmd', tab: 'pipeline', breaks: [], filters: {}, hasResults: false };
+    var state = { target: 'vmd', tab: 'resultado', breaks: [], filters: {}, hasResults: false };
     var API_BASE = '';
     var API_FALLBACK = 'http://127.0.0.1:8777';
     var API_AVAILABLE = false;
@@ -144,25 +144,7 @@
         return out;
     }
     async function resolveApiBase() {
-        var candidates = [];
-        if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
-            candidates.push(window.location.origin);
-        }
-        if (candidates.indexOf(API_FALLBACK) < 0) candidates.push(API_FALLBACK);
-
-        for (var i = 0; i < candidates.length; i++) {
-            var base = candidates[i];
-            try {
-                var r = await fetch(base + '/api/health', { cache: 'no-store' });
-                if (r.ok) {
-                    API_BASE = base;
-                    return;
-                }
-            } catch (e) {
-                // tenta próximo candidato
-            }
-        }
-        throw new Error('API indisponível. Execute "python webapp.py" e acesse em ' + API_FALLBACK + '.');
+        throw new Error('MVP estático: API desabilitada nesta versão.');
     }
 
     /* ─────────── Map ─────────── */
@@ -781,7 +763,6 @@
         state.breaks = quantileBreaks(vals, SCALE_COLORS.length);
     }
     function renderActiveTab() {
-        if (state.tab === 'pipeline') return;
         if (state.tab === 'resultado') renderResultado();
         else if (state.tab === 'calibracao') renderCalibracao();
         else if (state.tab === 'modelo') renderModelo();
@@ -796,9 +777,8 @@
         renderActiveTab();
     }
     function setTab(tab) {
-        if (!state.hasResults && tab !== 'pipeline') {
-            showPipelineStatus('Execute o pipeline para habilitar os resultados.', false);
-            tab = 'pipeline';
+        if (!state.hasResults) {
+            tab = 'resultado';
         }
         state.tab = tab;
         document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === tab); });
@@ -911,46 +891,18 @@
     /* ─────────── Init ─────────── */
     async function init() {
         var loading = document.getElementById('loading');
-        var initErrors = [];
         try {
             initMap();
             bindEvents();
             setPipelineControlsEnabled(false);
 
-            try {
-                await loadDataFiles();
-                setResultsReady(true);
-                populateFilters();
-                recomputeBreaks();
-                renderHeader();
-                renderMap();
-                setTab('resultado');
-            } catch (eData) {
-                initErrors.push('Dados estáticos indisponíveis: ' + eData.message);
-                setResultsReady(false);
-                resetHeaderPlaceholders();
-                renderMap();
-                setTab('pipeline');
-            }
-
-            try {
-                await resolveApiBase();
-                API_AVAILABLE = true;
-            } catch (eApi) {
-                API_AVAILABLE = false;
-                initErrors.push('API offline (pipeline/upload desabilitados).');
-            }
-
-            await initPipelinePanel();
-            if (API_AVAILABLE) setPipelineControlsEnabled(true);
-
-            if (!state.hasResults && !API_AVAILABLE) {
-                showPipelineStatus('Sem dados estáticos e sem API. Execute "python webapp.py" para modo dinâmico.', true);
-            } else if (state.hasResults && !API_AVAILABLE) {
-                showPipelineStatus('Modo estático carregado. Para reprocessar dados, execute "python webapp.py".', false);
-            } else if (state.hasResults && API_AVAILABLE) {
-                showPipelineStatus('Dados estáticos carregados e API online para reprocessamento.', false);
-            }
+            await loadDataFiles();
+            setResultsReady(true);
+            populateFilters();
+            recomputeBreaks();
+            renderHeader();
+            renderMap();
+            setTab('resultado');
 
             setExcelDownloadEnabled(false);
 
@@ -960,8 +912,7 @@
                 map.invalidateSize();
             }, 100);
         } catch (err) {
-            var msg = [err.message].concat(initErrors).join(' | ');
-            loading.innerHTML = '<p style="color:#ef4444;padding:20px;max-width:760px;">Erro: ' + msg + '</p>';
+            loading.innerHTML = '<p style="color:#ef4444;padding:20px;max-width:760px;">Erro ao carregar dados estáticos: ' + err.message + '</p>';
             console.error(err);
         }
     }

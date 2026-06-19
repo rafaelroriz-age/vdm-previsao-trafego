@@ -82,16 +82,12 @@ python pipeline.py
 # 2) Validar (testes + SLO)
 python -m pytest -q
 
-# 3) Fluxo dinâmico (upload -> opções -> pipeline -> visualizar/exportar Excel)
-python webapp.py
-# abra http://localhost:8777
-
-# 4) (Opcional) Visualizar apenas o site estático gerado
+# 3) Visualizar MVP estático
 python -m http.server 8778 --directory docs
 # abra http://localhost:8778
 ```
 
-> O frontend agora inicia em modo estático por padrão: se existir dado em `docs/data/` (ou `docs/data/local/`), o mapa abre sem exigir API. O `webapp.py` só é necessário para upload/reprocessamento via aba Pipeline.
+> MVP atual: front-end estático, sem dependência de API. O mapa carrega apenas a partir de arquivos em `docs/data/local/` (prioritário) ou `docs/data/`.
 
 ## Dataset JSON local privado (gitignored)
 
